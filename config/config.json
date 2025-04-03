@@ -1,5 +1,5 @@
 {
-  "scrapeInterval": 3600000, // Scrape every hour (in ms)
+  "scrapeInterval": 3600000,
   "sources": {
     "coingecko": "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=50"
   }

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeFiScraper Command Center</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="command-center">
+    <header>
+      <h1>DeFiScraper Command Center</h1>
+      <div class="system-status">
+        <span class="status-indicator <%= stats.systemStatus === 'running' ? 'running' : 'stopped' %>"></span>
+        <span>System: <%= stats.systemStatus === 'running' ? 'Running' : 'Stopped' %></span>
+      </div>
+      <a href="/logout" class="logout-btn">Logout</a>
+    </header>
+
+    <div class="dashboard-grid">
+      <!-- Left Sidebar: Stats and Charts -->
+      <div class="sidebar left-sidebar">
+        <div class="section">
+          <h2>Earnings Overview</h2>
+          <div class="stats-grid">
+            <div class="stat"><span>Total:</span> <%= (stats.total || 0).toFixed(4) %> BNB</div>
+            <div class="stat"><span>Hourly:</span> <%= (stats.hourly || 0).toFixed(4) %> BNB</div>
+            <div class="stat"><span>Daily:</span> <%= (stats.daily || 0).toFixed(4) %> BNB</div>
+            <div class="stat"><span>Weekly:</span> <%= (stats.weekly || 0).toFixed(4) %> BNB</div>
+            <div class="stat"><span>Monthly:</span> <%= (stats.monthly || 0).toFixed(4) %> BNB</div>
+            <div class="stat"><span>Expected Day:</span> <%= (stats.expected.day || 0).toFixed(4) %> BNB</div>
+            <div class="stat"><span>Expected Week:</span> <%= (stats.expected.week || 0).toFixed(4) %> BNB</div>
+            <div class="stat"><span>Expected Year:</span> <%= (stats.expected.year || 0).toFixed(4) %> BNB</div>
+            <div class="stat"><span>Total Items:</span> <%= stats.collected.length || 0 %></div>
+            <div class="stat"><span>Success Rate:</span> <%= (stats.successRate || 0).toFixed(2) %>%</div>
+            <div class="stat"><span>Avg Yield/Source:</span> <%= (stats.avgYield || 0).toFixed(4) %> BNB</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Overall Profit (BNB)</h2>
+          <canvas id="profitChart"></canvas>
+        </div>
+
+        <div class="section">
+          <h2>Activity Breakdown</h2>
+          <canvas id="activityChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Center: Feed -->
+      <div class="main-content">
+        <div class="section feed">
+          <h2>Activity Feed</h2>
+          <div class="feed-container">
+            <% (stats.feed || []).forEach(item => { %>
+              <div class="feed-item <%= item.type %>">
+                <span class="timestamp"><%= new Date(item.timestamp).toLocaleString() %></span>
+                <p><%= item.message %></p>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Sidebar: Additional Info -->
+      <div class="sidebar right-sidebar">
+        <div class="section">
+          <h2>Working Processes</h2>
+          <ul class="processes-list">
+            <% for (const [processName, process] of Object.entries(stats.processes)) { %>
+              <li class="process-item <%= process.status %>">
+                <span class="process-icon <%= process.status === 'running' ? 'mining' : '' %>"></span>
+                <span class="process-name"><%= processName %></span>
+                <span class="process-status">
+                  <%= process.status === 'running' ? 'Running' : 
+                      process.status === 'idle' ? 'Idle' : 
+                      process.status === 'error' ? 'Error' : 
+                      process.status === 'awaiting_funds' ? 'Awaiting Funds' : 'Stopped' %>
+                  <% if (process.message) { %> - <%= process.message %> <% } %>
+                </span>
+                <% if (process.lastRun) { %>
+                  <span class="process-timestamp">Last Run: <%= new Date(process.lastRun).toLocaleString() %></span>
+                <% } %>
+              </li>
+            <% } %>
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>Wallet Balances</h2>
+          <div class="wallets-grid">
+            <% (stats.wallets || []).forEach(wallet => { %>
+              <div class="wallet"><span><%= wallet.name %>:</span> <%= wallet.balance || 0 %> <%= wallet.chain %></div>
+            <% }); %>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Altcoins Generated</h2>
+          <div class="altcoins-grid">
+            <% (stats.altcoins || []).forEach(coin => { %>
+              <div class="altcoin"><span><%= coin.symbol %>:</span> <%= coin.amount || 0 %> (<%= coin.source %>)</div>
+            <% }); %>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Source Distribution</h2>
+          <canvas id="sourceChart"></canvas>
+        </div>
+
+        <div class="section">
+          <h2>Error Log</h2>
+          <ul class="list">
+            <% (stats.errors || []).forEach(error => { %>
+              <li><%= error.time %> - <%= error.fn %>: <%= error.message %></li>
+            <% }); %>
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>Sources Log</h2>
+          <ul class="sources">
+            <% (stats.sources || []).forEach(source => { %>
+              <li><%= source.time %> - <%= source.name %>: <%= source.item %></li>
+            <% }); %>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="/chart.js"></script>
+  <script src="/dashboard.js"></script>
+</body>
+</html>
