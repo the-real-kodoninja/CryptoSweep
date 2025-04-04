@@ -1,20 +1,7 @@
 const { decryptFile } = require("../../src/encryptFiles");
 const { logTransaction } = require("../../src/logTransactions");
-
-let decryptData;
-(async () => {
-  try {
-    const decryptedCode = await decryptFile("../../src/password.encrypted");
-    const module = { exports: {} };
-    eval(decryptedCode);
-    decryptData = module.exports.decryptData;
-  } catch (error) {
-    console.error("Failed to decrypt password.js:", error.message);
-    decryptData = () => {
-      throw new Error("Cannot decrypt data: password.js is encrypted and requires the correct password.");
-    };
-  }
-})();
+const { decryptData } = require("../../src/password");
+const path = require("path");
 
 const scrapeFaucets = async (addFeedItem, globalStats) => {
   globalStats.totalAttempts += 1;
@@ -33,10 +20,10 @@ const scrapeFaucets = async (addFeedItem, globalStats) => {
   return results;
 };
 
-const claimFaucets = async (wallets, addFeedItem, globalStats) => {
+const claimFaucets = async (wallets, addFeedItem, globalStats, nimbus) => {
   let encryptedWallets;
   try {
-    encryptedWallets = JSON.parse(await decryptFile("../../../config/wallets.encrypted"));
+    encryptedWallets = JSON.parse(await decryptFile(path.join(__dirname, "../../config/wallets.encrypted")));
   } catch (error) {
     console.error("Failed to decrypt wallets.json:", error.message);
     globalStats.errors.push({ time: new Date().toISOString(), message: "Failed to decrypt wallets.json", fn: "claimFaucets" });
@@ -69,22 +56,27 @@ const claimFaucets = async (wallets, addFeedItem, globalStats) => {
   globalStats.totalAttempts += 1;
   const results = [];
   try {
-    const amount = 0.00001; // Simulated faucet claim amount
+    const amount = 0.00001;
     console.log(`Claimed faucet: ${amount} BNB for ${wallet.address}`);
     globalStats.activity.faucets += 1;
     addFeedItem(`Claimed faucet: ${amount} BNB for ${wallet.address}`, "collection");
     results.push({ address: wallet.address, amount });
 
-    // Log the transaction
+    // Log earnings to Nimbus
+    const profit = amount * 0.1; 
+    if (nimbus) {
+      nimbus.logEarnings(profit);
+    }
+
     await logTransaction({
       type: "Faucet Claim",
       asset: "BNB",
       amount,
-      valueUSD: 0, // Placeholder (requires price API for real value)
+      valueUSD: 0,
       chain: "BSC",
       walletAddress: wallet.address,
       source: "Allcoins.pw",
-      txHash: "N/A", // Placeholder (requires actual transaction hash)
+      txHash: "N/A",
       notes: "Claimed from Allcoins.pw faucet",
     });
   } catch (error) {

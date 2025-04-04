@@ -3,8 +3,9 @@ const session = require("express-session");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
 const { startScraping, stopScraping, globalStats } = require("./scraper");
-const { decryptFile, encryptFile } = require("./encryptFiles");
-const LanguageModel = require("./languageModel");
+const { decryptFile } = require("./encryptFiles");
+const { initializeNimbus } = require("./nimbus");
+require("dotenv").config();
 
 const app = express();
 const port = 3000;
@@ -16,23 +17,7 @@ let PASSWORD;
     PASSWORD = await decryptFile(path.join(__dirname, "../config/password.encrypted"));
   } catch (error) {
     console.error("Failed to decrypt password:", error.message);
-    PASSWORD = "defaultPassword123"; // Fallback for testing
-  }
-})();
-
-// Decrypt wallets at runtime (needed for addWallet)
-let decryptData;
-(async () => {
-  try {
-    const decryptedCode = await decryptFile(path.join(__dirname, "password.encrypted"));
-    const module = { exports: {} };
-    eval(decryptedCode);
-    decryptData = module.exports.decryptData;
-  } catch (error) {
-    console.error("Failed to decrypt password.js for decryptData:", error.message);
-    decryptData = () => {
-      throw new Error("Cannot decrypt data: password.js is encrypted.");
-    };
+    PASSWORD = "defaultPassword123";
   }
 })();
 
@@ -57,37 +42,9 @@ const addFeedItem = (message, type) => {
   if (feedItems.length > 100) feedItems.shift();
 };
 
-// Initialize Nimbus language model with helper functions
-const updatePassword = async (newPassword) => {
-  try {
-    await encryptFile(newPassword, path.join(__dirname, "../config/password.encrypted"));
-    PASSWORD = newPassword;
-    addFeedItem(`Password updated to ${newPassword}`, "system");
-  } catch (error) {
-    console.error("Failed to update password:", error.message);
-    throw error;
-  }
-};
-
-const addWallet = async (walletAddress) => {
-  try {
-    let encryptedWallets = JSON.parse(await decryptFile(path.join(__dirname, "../config/wallets.encrypted")));
-    let decryptedWallets = decryptData(
-      encryptedWallets.encrypted,
-      encryptedWallets.iv,
-      encryptedWallets.key,
-      encryptedWallets.hash
-    );
-    decryptedWallets.wallets[walletAddress] = { address: walletAddress, privateKey: "placeholder" }; // Placeholder private key
-    await encryptFile(JSON.stringify(decryptedWallets), path.join(__dirname, "../config/wallets.encrypted"));
-    addFeedItem(`Wallet ${walletAddress} added`, "system");
-  } catch (error) {
-    console.error("Failed to add wallet:", error.message);
-    throw error;
-  }
-};
-
-const nimbus = new LanguageModel(globalStats, addFeedItem, updatePassword, addWallet);
+// Initialize Nimbus
+globalStats.PASSWORD = PASSWORD;
+const nimbus = initializeNimbus(globalStats, addFeedItem);
 
 let scrapingInterval = null;
 
@@ -132,7 +89,7 @@ app.post("/start", (req, res) => {
   if (!req.session.loggedIn) return res.status(401).json({ error: "Unauthorized" });
   if (!scrapingInterval) {
     console.log("Starting scraping...");
-    scrapingInterval = startScraping(addFeedItem);
+    scrapingInterval = startScraping(addFeedItem, nimbus);
     res.json({ status: "Scraping started" });
   } else {
     res.json({ status: "Scraping already running" });
@@ -175,6 +132,3 @@ app.get("/nimbus/logs", (req, res) => {
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
-
-// Export nimbus for other components to use (e.g., to log earnings)
-module.exports = { nimbus };

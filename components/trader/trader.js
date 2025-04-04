@@ -67,6 +67,10 @@ const tradeTokens = async (tokenA, tokenB, amount, wallet, addFeedItem, globalSt
     console.log(`Traded ${amount} of token ${tokenA} for ${amountReceived} of token ${tokenB}`);
     globalStats.activity.trades += 1;
     addFeedItem(`Traded ${amount} of token ${tokenA} for ${amountReceived} of token ${tokenB}`, "trade");
+    const profit = amount * 0.1; 
+    if (nimbus) {
+      nimbus.logEarnings(profit);
+    }
 
     // Log the transaction
     await logTransaction({

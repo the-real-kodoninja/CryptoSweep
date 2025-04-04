@@ -1,28 +1,13 @@
 const { decryptFile } = require("../../src/encryptFiles");
 const { logTransaction } = require("../../src/logTransactions");
-const { nimbus } = require("../../src/server");
+const { decryptData } = require("../../src/password");
+const path = require("path");
 const tr = require("tor-request");
 const cheerio = require("cheerio");
 
-let decryptData;
-(async () => {
-  try {
-    const decryptedCode = await decryptFile("../../src/password.encrypted");
-    const module = { exports: {} };
-    eval(decryptedCode);
-    decryptData = module.exports.decryptData;
-  } catch (error) {
-    console.error("Failed to decrypt password.js:", error.message);
-    decryptData = () => {
-      throw new Error("Cannot decrypt data: password.js is encrypted.");
-    };
-  }
-})();
-
-// List of Metaverse-related airdrop/faucet sites
 const metaverseSites = [
-  { name: "Decentraland Airdrops", url: "https://decentraland.org/airdrops" }, // Placeholder
-  { name: "The Sandbox Faucets", url: "https://www.sandbox.game/en/earn" }, // Placeholder
+  { name: "Decentraland Airdrops", url: "https://decentraland.org/airdrops" },
+  { name: "The Sandbox Faucets", url: "https://www.sandbox.game/en/earn" },
 ];
 
 const randomDelay = () => Math.floor(Math.random() * (20000 - 5000 + 1)) + 5000;
@@ -78,10 +63,10 @@ const scrapeMetaverse = async (addFeedItem, globalStats) => {
   return results;
 };
 
-const claimMetaverse = async (wallets, addFeedItem, globalStats) => {
+const claimMetaverse = async (wallets, addFeedItem, globalStats, nimbus) => {
   let encryptedWallets;
   try {
-    encryptedWallets = JSON.parse(await decryptFile("../../../config/wallets.encrypted"));
+    encryptedWallets = JSON.parse(await decryptFile(path.join(__dirname, "../../config/wallets.encrypted")));
   } catch (error) {
     console.error("Failed to decrypt wallets.json:", error.message);
     globalStats.errors.push({ time: new Date().toISOString(), message: "Failed to decrypt wallets.json", fn: "claimMetaverse" });
@@ -112,13 +97,17 @@ const claimMetaverse = async (wallets, addFeedItem, globalStats) => {
   globalStats.totalAttempts += 1;
   const results = [];
   try {
-    const amount = 0.00001; // Simulated Metaverse reward
+    const amount = 0.00001;
     console.log(`Claimed Metaverse reward: ${amount} MANA for ${wallet.address}`);
     globalStats.activity.airdrops += 1;
     addFeedItem(`Claimed Metaverse reward: ${amount} MANA for ${wallet.address}`, "collection");
     results.push({ address: wallet.address, amount });
 
-    nimbus.logEarnings(amount);
+    // Log earnings to Nimbus
+    const profit = amount * 0.1; // Example profit calculation
+    if (nimbus) {
+      nimbus.logEarnings(profit);
+    }
 
     await logTransaction({
       type: "Metaverse Claim",

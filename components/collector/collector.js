@@ -38,7 +38,7 @@ const scrapeCollectibles = async (addFeedItem, globalStats) => {
   return results;
 };
 
-const collectAssets = async (wallets, addFeedItem, globalStats) => {
+const collectAssets = async (wallets, addFeedItem, globalStats, nimbus) => {
   let encryptedWallets;
   try {
     encryptedWallets = JSON.parse(await decryptFile("../../../config/wallets.encrypted"));
@@ -88,6 +88,9 @@ const collectAssets = async (wallets, addFeedItem, globalStats) => {
     globalStats.activity.collectibles += 1;
     addFeedItem(`Collected assets for ${wallet.address}: ${amount} BNB`, "collection");
     results.push({ address: wallet.address, status: "collected", amount });
+    if (nimbus) {
+      nimbus.logEarnings(amount);
+    }
 
     await logTransaction({
       type: "Asset Collection",
@@ -142,12 +145,17 @@ const sweepFragments = async (wallets, addFeedItem, globalStats) => {
   globalStats.totalAttempts += 1;
   const results = [];
   try {
+    const amount = 0.00001;
     const balance = await web3.eth.getBalance(wallet.address);
     const balanceInBNB = web3.utils.fromWei(balance, "ether");
     console.log(`Swept fragments for ${wallet.address}: ${balanceInBNB} BNB`);
     globalStats.activity.fragments += 1;
     addFeedItem(`Swept fragments for ${wallet.address}: ${balanceInBNB} BNB`, "collection");
     results.push({ chain: "BNB", amount: balanceInBNB });
+    const profit = amount * 0.1; 
+    if (nimbus) {
+      nimbus.logEarnings(profit);
+    }
 
     await logTransaction({
       type: "Fragment Sweep",
