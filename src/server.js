@@ -1,131 +1,180 @@
 const express = require("express");
 const session = require("express-session");
-const helmet = require("helmet");
-const csurf = require("csurf");
-const rateLimit = require("express-rate-limit");
-const cookieParser = require("cookie-parser"); // Add cookie-parser
-const { startScraping } = require("./scraper");
-const { encryptedPasswordData, decryptPassword } = require("./password");
-require("dotenv").config();
+const path = require("path");
+const { v4: uuidv4 } = require("uuid");
+const { startScraping, stopScraping, globalStats } = require("./scraper");
+const { decryptFile, encryptFile } = require("./encryptFiles");
+const LanguageModel = require("./languageModel");
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = 3000;
 
-// Decrypt the password
-const PASSWORD = decryptPassword(
-  encryptedPasswordData.encrypted,
-  encryptedPasswordData.iv,
-  encryptedPasswordData.key
-);
+// Decrypt the password at runtime
+let PASSWORD;
+(async () => {
+  try {
+    PASSWORD = await decryptFile(path.join(__dirname, "../config/password.encrypted"));
+  } catch (error) {
+    console.error("Failed to decrypt password:", error.message);
+    PASSWORD = "defaultPassword123"; // Fallback for testing
+  }
+})();
 
-// Security middleware
-app.use(helmet()); // Set security headers
-app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per window
-  })
-);
+// Decrypt wallets at runtime (needed for addWallet)
+let decryptData;
+(async () => {
+  try {
+    const decryptedCode = await decryptFile(path.join(__dirname, "password.encrypted"));
+    const module = { exports: {} };
+    eval(decryptedCode);
+    decryptData = module.exports.decryptData;
+  } catch (error) {
+    console.error("Failed to decrypt password.js for decryptData:", error.message);
+    decryptData = () => {
+      throw new Error("Cannot decrypt data: password.js is encrypted.");
+    };
+  }
+})();
 
-// Cookie parser middleware (required for csurf with cookie: true)
-app.use(cookieParser());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, "../public")));
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "../views"));
 
-// Session middleware
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "your-session-secret",
+    secret: "9bd23961addabb0c2a963affdb121faa87e2d8927f7fb00fae5b138c499d24d3",
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 5 * 60 * 1000, secure: process.env.NODE_ENV === "production" }, // Secure cookie in production
   })
 );
 
-// CSRF protection
-const csrfProtection = csurf({ cookie: true });
-app.use(express.urlencoded({ extended: true }));
-app.use(csrfProtection);
+const feedItems = [];
 
-// Middleware to check session activity
-app.use((req, res, next) => {
-  if (req.session.isAuthenticated) {
-    req.session.touch();
-    next();
-  } else {
-    next();
+const addFeedItem = (message, type) => {
+  feedItems.push({ message, type, timestamp: new Date().toISOString() });
+  if (feedItems.length > 100) feedItems.shift();
+};
+
+// Initialize Nimbus language model with helper functions
+const updatePassword = async (newPassword) => {
+  try {
+    await encryptFile(newPassword, path.join(__dirname, "../config/password.encrypted"));
+    PASSWORD = newPassword;
+    addFeedItem(`Password updated to ${newPassword}`, "system");
+  } catch (error) {
+    console.error("Failed to update password:", error.message);
+    throw error;
   }
-});
+};
 
-// Pass CSRF token to views
-app.use((req, res, next) => {
-  res.locals.csrfToken = req.csrfToken();
-  next();
-});
+const addWallet = async (walletAddress) => {
+  try {
+    let encryptedWallets = JSON.parse(await decryptFile(path.join(__dirname, "../config/wallets.encrypted")));
+    let decryptedWallets = decryptData(
+      encryptedWallets.encrypted,
+      encryptedWallets.iv,
+      encryptedWallets.key,
+      encryptedWallets.hash
+    );
+    decryptedWallets.wallets[walletAddress] = { address: walletAddress, privateKey: "placeholder" }; // Placeholder private key
+    await encryptFile(JSON.stringify(decryptedWallets), path.join(__dirname, "../config/wallets.encrypted"));
+    addFeedItem(`Wallet ${walletAddress} added`, "system");
+  } catch (error) {
+    console.error("Failed to add wallet:", error.message);
+    throw error;
+  }
+};
 
-app.set("view engine", "ejs");
-app.use(express.static("public"));
+const nimbus = new LanguageModel(globalStats, addFeedItem, updatePassword, addWallet);
+
+let scrapingInterval = null;
 
 // Login route
-app.get("/", (req, res) => {
-  if (req.session.isAuthenticated) {
-    return res.redirect("/dashboard");
-  }
-  res.send(`
-    <html>
-      <head>
-        <title>DeFiScraper Login</title>
-        <link rel="stylesheet" href="/styles.css">
-      </head>
-      <body>
-        <div class="login-container">
-          <h1>DeFiScraper</h1>
-          <form action="/dashboard" method="POST">
-            <input type="hidden" name="_csrf" value="${res.locals.csrfToken}" />
-            <input type="password" name="password" placeholder="Enter Password" />
-            <button type="submit">Login</button>
-          </form>
-        </div>
-      </body>
-    </html>
-  `);
+app.get("/login", (req, res) => {
+  res.render("login", { error: null });
 });
 
-// Dashboard route with authentication check
-app.post("/dashboard", (req, res) => {
-  try {
-    if (req.body.password === PASSWORD) {
-      req.session.isAuthenticated = true;
-      res.render("dashboard", { stats: global.stats || { total: 0, hourly: 0, daily: 0, weekly: 0, monthly: 0, expected: { day: 0, week: 0, year: 0 }, collected: [], wallets: [], altcoins: [], nfts: [], sources: [], activity: {}, sourceItems: {}, feed: [] } });
-    } else {
-      res.status(401).send("Wrong password! Try again.");
-    }
-  } catch (error) {
-    console.error("Dashboard POST error:", error.message);
-    res.status(500).send("Internal server error.");
+app.post("/login", (req, res) => {
+  const { username, password } = req.body;
+  if (username === "the-real-kodoninja" && password === PASSWORD) {
+    req.session.loggedIn = true;
+    const sessionToken = uuidv4();
+    req.session.sessionToken = sessionToken;
+    req.session.username = username;
+    res.redirect(`/dashboard?user=${username}&session=${sessionToken}`);
+  } else {
+    res.render("login", { error: "Invalid username or password" });
   }
 });
 
+// Dashboard route with token validation
 app.get("/dashboard", (req, res) => {
-  if (!req.session.isAuthenticated) {
-    return res.redirect("/");
-  }
-  res.render("dashboard", { stats: global.stats || { total: 0, hourly: 0, daily: 0, weekly: 0, monthly: 0, expected: { day: 0, week: 0, year: 0 }, collected: [], wallets: [], altcoins: [], nfts: [], sources: [], activity: {}, sourceItems: {}, feed: [] } });
-});
-
-app.get("/scrape", (req, res) => {
-  try {
-    startScraping();
-    res.send("Scraping started!");
-  } catch (error) {
-    console.error("Scrape endpoint error:", error.message);
-    res.status(500).send("Failed to start scraping.");
+  const { user, session } = req.query;
+  if (
+    req.session.loggedIn &&
+    user === req.session.username &&
+    session === req.session.sessionToken
+  ) {
+    res.render("dashboard", { globalStats, feedItems });
+  } else {
+    res.redirect("/login");
   }
 });
 
-app.get("/logout", (req, res) => {
+app.post("/logout", (req, res) => {
   req.session.destroy();
-  res.redirect("/");
+  res.redirect("/login");
+});
+
+app.post("/start", (req, res) => {
+  if (!req.session.loggedIn) return res.status(401).json({ error: "Unauthorized" });
+  if (!scrapingInterval) {
+    console.log("Starting scraping...");
+    scrapingInterval = startScraping(addFeedItem);
+    res.json({ status: "Scraping started" });
+  } else {
+    res.json({ status: "Scraping already running" });
+  }
+});
+
+app.post("/stop", (req, res) => {
+  if (!req.session.loggedIn) return res.status(401).json({ error: "Unauthorized" });
+  if (scrapingInterval) {
+    console.log("Stopping scraping...");
+    stopScraping(scrapingInterval);
+    scrapingInterval = null;
+    res.json({ status: "Scraping stopped" });
+  } else {
+    res.json({ status: "Scraping not running" });
+  }
+});
+
+// Nimbus Chat Endpoints
+app.post("/nimbus/chat", async (req, res) => {
+  if (!req.session.loggedIn) return res.status(401).json({ error: "Unauthorized" });
+  const { message } = req.body;
+  if (!message) return res.status(400).json({ error: "Message is required" });
+
+  try {
+    const response = await nimbus.processMessage(message);
+    res.json({ response });
+  } catch (error) {
+    console.error("Error processing Nimbus message:", error.message);
+    res.status(500).json({ error: "Failed to process message" });
+  }
+});
+
+app.get("/nimbus/logs", (req, res) => {
+  if (!req.session.loggedIn) return res.status(401).json({ error: "Unauthorized" });
+  const logs = nimbus.getChatLogs();
+  res.json(logs);
 });
 
 app.listen(port, () => {
-  console.log(`DeFiScraper running on port ${port}`);
+  console.log(`Server running on port ${port}`);
 });
+
+// Export nimbus for other components to use (e.g., to log earnings)
+module.exports = { nimbus };

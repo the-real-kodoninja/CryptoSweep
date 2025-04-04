@@ -1,0 +1,50 @@
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment variables
+.env
+
+# Sensitive files (already encrypted, but exclude unencrypted versions)
+components/superMiner/superMiner.js
+src/password.js
+config/wallets.json
+config/password.json
+
+# Additional configuration files
+config/config.json
+config/*.json
+
+# Logs
+logs/
+*.log
+
+# Local data and databases
+data/
+*.db
+*.sqlite
+
+# Temporary files
+tmp/
+*.tmp
+*.bak
+
+# Build artifacts
+dist/
+build/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Other sensitive files
+*.key
+*.pem
+*.cert

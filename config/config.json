@@ -3,4 +3,9 @@
   "sources": {
     "coingecko": "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=50"
   }
+},{
+  "wallets": ["0xYourAddress1", "0xYourAddress2"],
+  "superMiner": {
+    "enabled": false
+  }
 }

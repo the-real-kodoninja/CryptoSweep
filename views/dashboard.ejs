@@ -1,136 +1,159 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DeFiScraper Command Center</title>
-  <link rel="stylesheet" href="/styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeFiScraper Command Center</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/chart.js"></script>
+    <script src="/dashboard.js"></script>
 </head>
 <body>
-  <div class="command-center">
-    <header>
-      <h1>DeFiScraper Command Center</h1>
-      <div class="system-status">
-        <span class="status-indicator <%= stats.systemStatus === 'running' ? 'running' : 'stopped' %>"></span>
-        <span>System: <%= stats.systemStatus === 'running' ? 'Running' : 'Stopped' %></span>
-      </div>
-      <a href="/logout" class="logout-btn">Logout</a>
-    </header>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>DeFiScraper Command Center</h1>
+            <div class="status">
+                <span id="status-circle" class="<%= globalStats.processes.scrapeReddit.status === 'running' ? 'running' : 'stopped' %>"></span>
+                <span>System: <%= globalStats.processes.scrapeReddit.status === 'running' ? 'Running' : 'Stopped' %></span>
+            </div>
+            <form action="/logout" method="POST">
+                <button type="submit">Logout</button>
+            </form>
+        </header>
 
-    <div class="dashboard-grid">
-      <!-- Left Sidebar: Stats and Charts -->
-      <div class="sidebar left-sidebar">
-        <div class="section">
-          <h2>Earnings Overview</h2>
-          <div class="stats-grid">
-            <div class="stat"><span>Total:</span> <%= (stats.total || 0).toFixed(4) %> BNB</div>
-            <div class="stat"><span>Hourly:</span> <%= (stats.hourly || 0).toFixed(4) %> BNB</div>
-            <div class="stat"><span>Daily:</span> <%= (stats.daily || 0).toFixed(4) %> BNB</div>
-            <div class="stat"><span>Weekly:</span> <%= (stats.weekly || 0).toFixed(4) %> BNB</div>
-            <div class="stat"><span>Monthly:</span> <%= (stats.monthly || 0).toFixed(4) %> BNB</div>
-            <div class="stat"><span>Expected Day:</span> <%= (stats.expected.day || 0).toFixed(4) %> BNB</div>
-            <div class="stat"><span>Expected Week:</span> <%= (stats.expected.week || 0).toFixed(4) %> BNB</div>
-            <div class="stat"><span>Expected Year:</span> <%= (stats.expected.year || 0).toFixed(4) %> BNB</div>
-            <div class="stat"><span>Total Items:</span> <%= stats.collected.length || 0 %></div>
-            <div class="stat"><span>Success Rate:</span> <%= (stats.successRate || 0).toFixed(2) %>%</div>
-            <div class="stat"><span>Avg Yield/Source:</span> <%= (stats.avgYield || 0).toFixed(4) %> BNB</div>
-          </div>
-        </div>
+        <!-- Main Layout -->
+        <div class="layout">
+            <!-- Left Sidebar: Earnings -->
+            <aside class="sidebar left">
+                <h2>Earnings Overview</h2>
+                <p>Total: 0 BNB</p>
+                <p>Hourly: 0 BNB</p>
+                <p>Daily: 0 BNB</p>
+                <p>Weekly: 0 BNB</p>
+                <p>Monthly: 0 BNB</p>
+                <h3>Overall Profit (BNB)</h3>
+                <canvas id="profitChart"></canvas>
+                <h3>Activity Breakdown</h3>
+                <canvas id="activityChart"></canvas>
+            </aside>
 
-        <div class="section">
-          <h2>Overall Profit (BNB)</h2>
-          <canvas id="profitChart"></canvas>
-        </div>
+            <!-- Center: Activity Feed -->
+            <main>
+                <h2>Activity Feed</h2>
+                <div class="feed">
+                    <% feedItems.forEach(item => { %>
+                        <p class="<%= item.type %>"><%= item.message %></p>
+                    <% }); %>
+                </div>
+            </main>
 
-        <div class="section">
-          <h2>Activity Breakdown</h2>
-          <canvas id="activityChart"></canvas>
-        </div>
-      </div>
+            <!-- Right Sidebar: Processes and Stats -->
+            <aside class="sidebar right">
+                <h2>Working Processes</h2>
+                <ul>
+                    <li>
+                        <span class="process <%= globalStats.processes.scrapeReddit.status %>">Reddit Scraper</span>
+                        <span><%= globalStats.processes.scrapeReddit.status %>: <%= globalStats.processes.scrapeReddit.message || 'Idle' %></span>
+                    </li>
+                    <li>
+                        <span class="process <%= globalStats.processes.scrapeX.status %>">X Scraper</span>
+                        <span><%= globalStats.processes.scrapeX.status %>: <%= globalStats.processes.scrapeX.message || 'Idle' %></span>
+                    </li>
+                    <li>
+                        <span class="process <%= globalStats.processes.scrapeWeb.status %>">Web Scraper</span>
+                        <span><%= globalStats.processes.scrapeWeb.status %>: <%= globalStats.processes.scrapeWeb.message || 'Idle' %></span>
+                    </li>
+                    <li>
+                        <span class="process <%= globalStats.processes.scrapeHackerOne.status %>">HackerOne Scraper</span>
+                        <span><%= globalStats.processes.scrapeHackerOne.status %>: <%= globalStats.processes.scrapeHackerOne.message || 'Idle' %></span>
+                    </li>
+                    <li>
+                        <span class="process <%= globalStats.processes.scrapeCharityDrops.status %>">Charity Drops Scraper</span>
+                        <span><%= globalStats.processes.scrapeCharityDrops.status %>: <%= globalStats.processes.scrapeCharityDrops.message || 'Idle' %></span>
+                    </li>
+                    <li>
+                        <span class="process <%= globalStats.processes.scrapeSnapshotDAO.status %>">Snapshot DAO Scraper</span>
+                        <span><%= globalStats.processes.scrapeSnapshotDAO.status %>: <%= globalStats.processes.scrapeSnapshotDAO.message || 'Idle' %></span>
+                    </li>
+                    <li>
+                        <span class="process <%= globalStats.processes.scrapeFaucets.status %>">Faucet Scraper</span>
+                        <span><%= globalStats.processes.scrapeFaucets.status %>: <%= globalStats.processes.scrapeFaucets.message || 'Idle' %></span>
+                    </li>
+                    <li>
+                        <span class="process <%= globalStats.processes.claimFaucets.status %>">Faucet Claimer</span>
+                        <span><%= globalStats.processes.claimFaucets.status %>: <%= globalStats.processes.claimFaucets.message || 'Idle' %></span>
+                    </li>
+                    <li>
+                        <span class="process <%= globalStats.processes.scrapePancakeSwap.status %>">PancakeSwap Scraper</span>
+                        <span><%= globalStats.processes.scrapePancakeSwap.status %>: <%= globalStats.processes.scrapePancakeSwap.message || 'Idle' %></span>
+                    </li>
+                    <li>
+                        <span class="process <%= globalStats.processes.scrapeInstagramChallenges.status %>">Instagram Scraper</span>
+                        <span><%= globalStats.processes.scrapeInstagramChallenges.status %>: <%= globalStats.processes.scrapeInstagramChallenges.message || 'Idle' %></span>
+                    </li>
+                    <li>
+                        <span class="process <%= globalStats.processes.scrapeCollectibles.status %>">Collectibles Scraper</span>
+                        <span><%= globalStats.processes.scrapeCollectibles.status %>: <%= globalStats.processes.scrapeCollectibles.message || 'Idle' %></span>
+                    </li>
+                    <li>
+                        <span class="process <%= globalStats.processes.collectAssets.status %>">Asset Collector</span>
+                        <span><%= globalStats.processes.collectAssets.status %>: <%= globalStats.processes.collectAssets.message || 'Idle' %></span>
+                    </li>
+                    <li>
+                        <span class="process <%= globalStats.processes.sweepFragments.status %>">Fragment Sweeper</span>
+                        <span><%= globalStats.processes.sweepFragments.status %>: <%= globalStats.processes.sweepFragments.message || 'Idle' %></span>
+                    </li>
+                    <li>
+                        <span class="process <%= globalStats.processes.tradeTokens.status %>">Token Trader</span>
+                        <span><%= globalStats.processes.tradeTokens.status %>: <%= globalStats.processes.tradeTokens.message || 'Idle' %></span>
+                    </li>
+                    <li>
+                        <span class="process <%= globalStats.processes.sweepWallets.status %>">Wallet Sweeper</span>
+                        <span><%= globalStats.processes.sweepWallets.status %>: <%= globalStats.processes.sweepWallets.message || 'Idle' %></span>
+                    </li>
+                    <li>
+                        <span class="process <%= globalStats.processes.distributeAssets.status %>">Asset Distributor</span>
+                        <span><%= globalStats.processes.distributeAssets.status %>: <%= globalStats.processes.distributeAssets.message || 'Idle' %></span>
+                    </li>
+                    <li>
+                        <span class="process <%= globalStats.processes.superMine.status %>">Super Miner</span>
+                        <span><%= globalStats.processes.superMine.status %>: <%= globalStats.processes.superMine.message || 'Idle' %></span>
+                    </li>
+                </ul>
 
-      <!-- Center: Feed -->
-      <div class="main-content">
-        <div class="section feed">
-          <h2>Activity Feed</h2>
-          <div class="feed-container">
-            <% (stats.feed || []).forEach(item => { %>
-              <div class="feed-item <%= item.type %>">
-                <span class="timestamp"><%= new Date(item.timestamp).toLocaleString() %></span>
-                <p><%= item.message %></p>
-              </div>
-            <% }); %>
-          </div>
-        </div>
-      </div>
+                <h2>Wallet Balances</h2>
+                <p>BNB: 0</p>
+                <p>ETH: 0</p>
+                <p>Polygon: 0</p>
 
-      <!-- Right Sidebar: Additional Info -->
-      <div class="sidebar right-sidebar">
-        <div class="section">
-          <h2>Working Processes</h2>
-          <ul class="processes-list">
-            <% for (const [processName, process] of Object.entries(stats.processes)) { %>
-              <li class="process-item <%= process.status %>">
-                <span class="process-icon <%= process.status === 'running' ? 'mining' : '' %>"></span>
-                <span class="process-name"><%= processName %></span>
-                <span class="process-status">
-                  <%= process.status === 'running' ? 'Running' : 
-                      process.status === 'idle' ? 'Idle' : 
-                      process.status === 'error' ? 'Error' : 
-                      process.status === 'awaiting_funds' ? 'Awaiting Funds' : 'Stopped' %>
-                  <% if (process.message) { %> - <%= process.message %> <% } %>
-                </span>
-                <% if (process.lastRun) { %>
-                  <span class="process-timestamp">Last Run: <%= new Date(process.lastRun).toLocaleString() %></span>
-                <% } %>
-              </li>
-            <% } %>
-          </ul>
-        </div>
+                <h2>Altcoins Generated</h2>
+                <p>No altcoins generated yet.</p>
 
-        <div class="section">
-          <h2>Wallet Balances</h2>
-          <div class="wallets-grid">
-            <% (stats.wallets || []).forEach(wallet => { %>
-              <div class="wallet"><span><%= wallet.name %>:</span> <%= wallet.balance || 0 %> <%= wallet.chain %></div>
-            <% }); %>
-          </div>
-        </div>
+                <h2>Source Distribution</h2>
+                <canvas id="sourceChart"></canvas>
 
-        <div class="section">
-          <h2>Altcoins Generated</h2>
-          <div class="altcoins-grid">
-            <% (stats.altcoins || []).forEach(coin => { %>
-              <div class="altcoin"><span><%= coin.symbol %>:</span> <%= coin.amount || 0 %> (<%= coin.source %>)</div>
-            <% }); %>
-          </div>
-        </div>
+                <h2>Error Log</h2>
+                <div class="log">
+                    <% globalStats.errors.forEach(error => { %>
+                        <p class="error"><%= error.time %>: <%= error.message %> (<%= error.fn %>)</p>
+                    <% }); %>
+                </div>
 
-        <div class="section">
-          <h2>Source Distribution</h2>
-          <canvas id="sourceChart"></canvas>
+                <h2>Sources Log</h2>
+                <div class="log">
+                    <p>Reddit: <%= globalStats.sourceItems.Reddit %> items</p>
+                    <p>Twitter: <%= globalStats.sourceItems.Twitter %> items</p>
+                    <p>HackerOne: <%= globalStats.sourceItems.HackerOne %> items</p>
+                    <p>Charity: <%= globalStats.sourceItems.Charity %> items</p>
+                    <p>Snapshot: <%= globalStats.sourceItems.Snapshot %> items</p>
+                    <p>Faucets: <%= globalStats.sourceItems.Faucets %> items</p>
+                    <p>PancakeSwap: <%= globalStats.sourceItems.PancakeSwap %> items</p>
+                    <p>Instagram: <%= globalStats.sourceItems.Instagram %> items</p>
+		    <p>Metaverse: <%= globalStats.sourceItems.Metaverse %> items</p>
+                </div>
+            </aside>
         </div>
-
-        <div class="section">
-          <h2>Error Log</h2>
-          <ul class="list">
-            <% (stats.errors || []).forEach(error => { %>
-              <li><%= error.time %> - <%= error.fn %>: <%= error.message %></li>
-            <% }); %>
-          </ul>
-        </div>
-
-        <div class="section">
-          <h2>Sources Log</h2>
-          <ul class="sources">
-            <% (stats.sources || []).forEach(source => { %>
-              <li><%= source.time %> - <%= source.name %>: <%= source.item %></li>
-            <% }); %>
-          </ul>
-        </div>
-      </div>
     </div>
-  </div>
-  <script src="/chart.js"></script>
-  <script src="/dashboard.js"></script>
 </body>
 </html>
